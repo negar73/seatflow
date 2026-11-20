@@ -1,4 +1,4 @@
-# SeatFlow 🎟️
+# SeatFlow
 
 **A booking platform that survives the race condition.**
 
@@ -6,24 +6,20 @@ SeatFlow is a production-shaped event ticketing demo built around one hard probl
 
 [![CI](https://github.com/negar73/seatflow/actions/workflows/ci.yml/badge.svg)](https://github.com/negar73/seatflow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./README.md#-roadmap)
-
 
 ---
 
-## ✨ Features
+## Features
 
-- 🪑 **Interactive seat map** — sections, rows and per-seat pricing; live availability (available / held / booked), multi-select up to 6 seats with a running total.
-- ⏱️ **5-minute seat holds** — claiming seats starts a real TTL. A countdown on checkout shows exactly how long you have; expiry is enforced three independent ways (delayed job, cron endpoint, lazy sweep).
-- 🔐 **Idempotent checkout** — every confirm request carries an `Idempotency-Key`; retries, double-clicks and flaky networks can never create a second booking or charge.
-- 💳 **Queue-based payment processing** — checkout returns instantly while a BullMQ worker charges a mock gateway (2 s latency, 15% random declines, 3 attempts with exponential backoff) and the booking page live-polls the result.
-- ↩️ **Compensation on failure** — when payment fails for good, the worker atomically marks the booking `FAILED` *and* releases the seats back to inventory.
-- 🧾 **Booking status page** — animated stepper (held → processing → confirmed/failed), receipt with per-seat prices and a reference code.
-- 🌗 **Dark / light mode**, responsive layout, guest checkout — no auth friction for the demo.
+- **Interactive seat map** — sections, rows and per-seat pricing; live availability (available / held / booked), multi-select up to 6 seats with a running total.
+- ⏱ **5-minute seat holds** — claiming seats starts a real TTL. A countdown on checkout shows exactly how long you have; expiry is enforced three independent ways (delayed job, cron endpoint, lazy sweep).
+- **Idempotent checkout** — every confirm request carries an `Idempotency-Key`; retries, double-clicks and flaky networks can never create a second booking or charge.
+- **Queue-based payment processing** — checkout returns instantly while a BullMQ worker charges a mock gateway (2 s latency, 15% random declines, 3 attempts with exponential backoff) and the booking page live-polls the result.
+- ↩ **Compensation on failure** — when payment fails for good, the worker atomically marks the booking `FAILED` *and* releases the seats back to inventory.
+- **Booking status page** — animated stepper (held → processing → confirmed/failed), receipt with per-seat prices and a reference code.
+- **Dark / light mode**, responsive layout, guest checkout — no auth friction for the demo.
 
-## 🧠 The interesting part: how concurrency is actually handled
+## The interesting part: how concurrency is actually handled
 
 Ticketing is the textbook race-condition scenario. The naive implementation reads seat availability, then writes a booking — and under load, two requests both read "available" and both win. SeatFlow closes that window with four cooperating mechanisms.
 
@@ -75,21 +71,21 @@ Checkout commits a `PENDING` booking plus `BOOKED` seats, then enqueues a BullMQ
    │                         │                            │                     │                     │
    │  POST /events/:id/hold  │                            │                     │                     │
    ├────────────────────────►│ BEGIN                      │                     │                     │
-   │                         │ SELECT … FOR UPDATE  🔒───►│                     │                     │
+   │                         │ SELECT … FOR UPDATE    ───►│                     │                     │
    │                         │  (blocks 2nd buyer here)   │                     │                     │
    │                         │ all AVAILABLE?  ──no──► 409 SEATS_UNAVAILABLE     │                     │
    │                         │ seats → HELD (TTL 5 min)   │                     │                     │
-   │                         │ COMMIT  🔓                 │                     │                     │
+   │                         │ COMMIT                     │                     │                     │
    │                         │ schedule release job ──────────────────────────►│ ───────────────────►│ (TTL + 5 s)
    │◄── holdToken, expiresAt ┤                            │                     │                     │
    │                         │                            │                     │                     │
    │  POST /bookings/confirm │  (Idempotency-Key header)  │                     │                     │
    ├────────────────────────►│ key seen before? ──yes──► 200 (original booking, no new rows)       │
-   │                         │ BEGIN · SELECT … FOR UPDATE 🔒                    │                     │
+   │                         │ BEGIN · SELECT … FOR UPDATE                       │                     │
    │                         │ HELD by token & not expired?                    │                     │
    │                         │   ├── no, expired ──► 410 HOLD_EXPIRED          │                     │
    │                         │   └── yes: Booking(PENDING) + seats → BOOKED    │                     │
-   │                         │ COMMIT  🔓                 │                     │                     │
+   │                         │ COMMIT                     │                     │                     │
    │                         │ enqueue "payments" ────────────────────────────►│ ─── deliver job ───►│
    │◄── bookingId (201) ─────┤                            │                     │  charge (mock 2 s)  │
    │                         │                            │                     │  fail? retry ×3     │
@@ -101,7 +97,7 @@ Checkout commits a `PENDING` booking plus `BOOKED` seats, then enqueues a BullMQ
 
 **Net effect:** overlapping holds serialize at the database, a hold can be lost but never stolen, checkout retries converge on one booking, and failed payments heal themselves by returning seats to the pool.
 
-## 🏗️ Architecture
+## Architecture
 
 ```text
 ┌───────────────────────────────┐
@@ -128,24 +124,24 @@ Checkout commits a `PENDING` booking plus `BOOKED` seats, then enqueues a BullMQ
 │                               │        │                                │
 │   "payments"      queue ──────┼───────►│   charge mock gateway          │
 │   "hold-expiry"   queue ──────┼───────►│   retry ×3 · exponential       │
-│                               │        │   ✔ confirm / ✖ fail + release │
+│                               │        │      confirm /    fail + release │
 └───────────────────────────────┘        └────────────────────────────────┘
 ```
 
-## 🧰 Tech stack
+## Tech stack
 
-| Layer            | Choice                                            | Why                                                                    |
+| Layer      | Choice                      | Why                                  |
 | ---------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
-| Framework        | Next.js 16 (App Router) + TypeScript (strict)     | One codebase for UI + API routes, typed end-to-end                     |
-| Styling          | Tailwind CSS v4 + lucide-react                    | Utility-first, no component library lock-in                            |
-| Database         | PostgreSQL 16 via Prisma ORM                      | Relational integrity + `SELECT … FOR UPDATE` row locks                 |
-| Validation       | Zod                                               | Every API input parsed and validated at the boundary                   |
-| Queues           | BullMQ + ioredis                                  | Delayed hold-expiry jobs, retry/backoff semantics for payments         |
-| State (client)   | Zustand                                           | Minimal store for seat selection                                       |
-| Worker runtime   | tsx                                               | Type-safe standalone worker process, no build step                     |
-| CI / packaging   | GitHub Actions · Docker (multi-stage) · Compose   | Typecheck + lint on every PR; reproducible local infra                 |
+| Framework    | Next.js 16 (App Router) + TypeScript (strict)   | One codebase for UI + API routes, typed end-to-end           |
+| Styling     | Tailwind CSS v4 + lucide-react          | Utility-first, no component library lock-in              |
+| Database     | PostgreSQL 16 via Prisma ORM           | Relational integrity + `SELECT … FOR UPDATE` row locks         |
+| Validation    | Zod                        | Every API input parsed and validated at the boundary          |
+| Queues      | BullMQ + ioredis                 | Delayed hold-expiry jobs, retry/backoff semantics for payments     |
+| State (client)  | Zustand                      | Minimal store for seat selection                    |
+| Worker runtime  | tsx                        | Type-safe standalone worker process, no build step           |
+| CI / packaging  | GitHub Actions · Docker (multi-stage) · Compose  | Typecheck + lint on every PR; reproducible local infra         |
 
-## 🚀 Getting started
+## Getting started
 
 Prerequisites: **Node.js ≥ 20** and **Docker** (for Postgres + Redis).
 
@@ -172,7 +168,7 @@ Then: open an event → pick seats → **Hold seats** → complete the mock chec
 
 **To demo the failure path**, leave `FORCE_PAYMENT_SUCCESS="false"` (default): ~15% of payments fail randomly and you can watch the worker retry (2 s → 4 s → 8 s) and finally release the seats. Set `FORCE_PAYMENT_SUCCESS="true"` in `.env` for a flawless recorded demo.
 
-> The app still starts without Redis — only hold/confirm then fail with a clear error. Browse, seat maps and expiry sweeps keep working.
+>The app still starts without Redis — only hold/confirm then fail with a clear error. Browse, seat maps and expiry sweeps keep working.
 
 ### Handy curl checks
 
@@ -187,16 +183,16 @@ curl -X POST http://localhost:3000/api/bookings/confirm \
   -d '{"holdToken":"<token>","customerName":"Ada Lovelace","customerEmail":"ada@example.com","cardNumber":"4242 4242 4242 4242","cardExpiry":"12/28","cardCvc":"123"}'
 ```
 
-## 🔐 Environment variables
+## Environment variables
 
-| Variable                | Required | Default                                                  | Purpose                                                            |
+| Variable        | Required | Default                         | Purpose                              |
 | ----------------------- | -------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
-| `DATABASE_URL`          | ✅       | —                                                        | PostgreSQL connection string used by Prisma                        |
-| `REDIS_URL`             | ✅       | `redis://localhost:6379`                                 | Redis connection for BullMQ (payment + hold-expiry queues)         |
-| `FORCE_PAYMENT_SUCCESS` | —        | `false`                                                  | `true` disables the 15% random gateway decline (for demos)         |
-| `CRON_SECRET`           | —        | *(unset)*                                                | When set, `POST /api/bookings/release-expired` requires `x-cron-secret: <value>` |
+| `DATABASE_URL`     |    | —                            | PostgreSQL connection string used by Prisma            |
+| `REDIS_URL`       |    | `redis://localhost:6379`                 | Redis connection for BullMQ (payment + hold-expiry queues)     |
+| `FORCE_PAYMENT_SUCCESS` | —    | `false`                         | `true` disables the 15% random gateway decline (for demos)     |
+| `CRON_SECRET`      | —    | *(unset)*                        | When set, `POST /api/bookings/release-expired` requires `x-cron-secret: <value>` |
 
-## 📁 Project structure
+## Project structure
 
 ```text
 seatflow/
@@ -214,7 +210,7 @@ seatflow/
 │   │   └── api/               # REST endpoints (zod-validated route handlers)
 │   ├── components/            # seat map, header, cards, status view, theme toggle
 │   ├── lib/
-│   │   ├── reservation.ts     # ⭐ the concurrency engine (locking, holds, idempotency)
+│   │   ├── reservation.ts     #    the concurrency engine (locking, holds, idempotency)
 │   │   ├── queue.ts           # BullMQ producers (lazy, build-safe)
 │   │   ├── errors.ts          # typed errors → HTTP codes
 │   │   ├── http.ts            # zod body parsing + error funnel
@@ -228,7 +224,7 @@ seatflow/
 └── docker-compose.yml         # postgres:16-alpine + redis:7-alpine
 ```
 
-## 🗺️ Roadmap
+## Roadmap
 
 Graded by how much systems-design muscle each step demonstrates:
 
@@ -240,6 +236,6 @@ Graded by how much systems-design muscle each step demonstrates:
 6. **Playwright e2e stress test** — "100 parallel holds on the last seat → exactly 1 succeeds, 99 get `409`", plus a payment-failure snapshot of the compensation path.
 7. **Email receipts** — transactional email on `CONFIRMED` / `FAILED` transitions (worker already has the hook point).
 
-## 📄 License
+## License
 
 [MIT](./LICENSE) © 2025 Negar Shojaei
