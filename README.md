@@ -5,7 +5,23 @@
 SeatFlow is a production-shaped event ticketing demo built around one hard problem: *two people try to buy the same seat at the same time — exactly one of them wins, and nobody is double-charged.* The interesting parts (pessimistic row locking, hold TTLs, idempotent checkout, queue-based payments with retries and seat-releasing compensation) are implemented as real, running code — not described in comments.
 
 [![CI](https://github.com/negar73/seatflow/actions/workflows/ci.yml/badge.svg)](https://github.com/negar73/seatflow/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+
+---
+
+## Demo
+
+No hosted demo — the interesting part of this project is the concurrency machinery (Postgres row locks, Redis queues, a payment worker), and that needs real processes, not a static page. Locally:
+
+```bash
+docker compose up -d                 # Postgres 16 + Redis 7
+npm install
+cp .env.example .env                 # defaults match docker-compose.yml
+npm run db:push && npm run db:seed   # 2 events x 100 seats
+npm run dev                          # app    -> http://localhost:3000
+npm run worker                       # payment worker (second terminal)
+```
+
+Open an event, pick seats, hold them and run the mock checkout. With the default `FORCE_PAYMENT_SUCCESS="false"` roughly 15% of payments fail on purpose — the booking page sits on *processing* while the worker retries (2 s -> 4 s -> 8 s), then flips to *failed* and the seats return to the map. The two-browser race for the same seat is the real demo: one hold wins, the loser gets a typed `409 SEATS_UNAVAILABLE`.
 
 ---
 
@@ -235,7 +251,3 @@ Graded by how much systems-design muscle each step demonstrates:
 5. **Waitlist for sold-out events** — notify on released seats (the compensation path already feeds it).
 6. **Playwright e2e stress test** — "100 parallel holds on the last seat → exactly 1 succeeds, 99 get `409`", plus a payment-failure snapshot of the compensation path.
 7. **Email receipts** — transactional email on `CONFIRMED` / `FAILED` transitions (worker already has the hook point).
-
-## License
-
-[MIT](./LICENSE) © 2025 Negar Shojaei
