@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+next-env.d.ts
+
+# Environment variables — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs & OS artifacts
+*.log
+npm-debug.log*
+.DS_Store
+
+# Misc
+.vercel/
+*.pem

@@ -1,0 +1,48 @@
+{
+  "name": "seatflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event booking & ticketing platform with concurrency-safe seat holds, idempotent checkout and queue-based payment processing.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "worker": "tsx worker/worker.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.11.1",
+    "bullmq": "^5.56.0",
+    "ioredis": "^5.6.1",
+    "lucide-react": "^0.525.0",
+    "nanoid": "^5.1.5",
+    "next": "^16.1.1",
+    "next-themes": "^0.4.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^4.0.2",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.17.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16.1.1",
+    "prisma": "^6.11.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.20.3",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "trustedDependencies": [
+    "unrs-resolver"
+  ]
+}

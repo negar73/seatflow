@@ -1,0 +1,115 @@
+// SeatFlow — database schema
+//
+// The interesting part of this schema is the Seat model: it carries the
+// pessimistic-locking state machine (AVAILABLE → HELD → BOOKED) that the
+// reservation engine in src/lib/reservation.ts drives with
+// `SELECT … FOR UPDATE` row locks.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  venue       String
+  startsAt    DateTime @map("starts_at")
+  posterEmoji String   @map("poster_emoji")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  seats    Seat[]
+  bookings Booking[]
+
+  @@index([startsAt])
+}
+
+model Seat {
+  id         String     @id @default(cuid())
+  eventId    String     @map("event_id")
+  section    String
+  row        Int
+  seatNumber Int        @map("seat_number")
+  priceCents Int        @map("price_cents")
+
+  // --- reservation state machine (driven by src/lib/reservation.ts) -------
+  status    SeatStatus @default(AVAILABLE)
+  // How long the hold lasts. `releaseExpiredHolds()` reclaims every seat
+  // whose held_until is in the past — this is the TTL of a hold.
+  heldUntil DateTime?  @map("held_until")
+  // Opaque token identifying *who* holds this seat. The checkout endpoint
+  // proves ownership of the hold by presenting this token.
+  holdToken String?    @map("hold_token")
+
+  event    Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  bookings BookingSeat[]
+
+  @@index([eventId])
+  // Serves the expiry sweeper: WHERE status = 'HELD' AND held_until < now
+  @@index([status, heldUntil])
+  // Serves checkout: WHERE hold_token = ? FOR UPDATE
+  @@index([holdToken])
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  eventId        String        @map("event_id")
+  event          Event         @relation(fields: [eventId], references: [id])
+  customerName   String        @map("customer_name")
+  customerEmail  String        @map("customer_email")
+
+  status BookingStatus @default(PENDING)
+  totalCents Int       @map("total_cents")
+
+  // Idempotency: a client retrying checkout with the same key gets the
+  // original booking back instead of creating a duplicate.
+  idempotencyKey String @unique @map("idempotency_key")
+
+  // The hold this booking was created from (kept for audit purposes;
+  // it is cleared from the seats themselves once they become BOOKED).
+  holdToken String? @map("hold_token")
+
+  // Set by the payment worker when all retries are exhausted, so the UI can
+  // explain *why* a booking failed.
+  failureReason String? @map("failure_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  seats BookingSeat[]
+
+  @@index([eventId])
+  @@index([status])
+}
+
+model BookingSeat {
+  bookingId  String @map("booking_id")
+  seatId     String @map("seat_id")
+  // Price is snapshotted at booking time so later price changes
+  // never mutate historical bookings.
+  priceCents Int    @map("price_cents")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seat    Seat    @relation(fields: [seatId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, seatId])
+  @@index([seatId])
+}
