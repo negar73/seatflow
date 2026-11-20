@@ -4,13 +4,12 @@
 
 SeatFlow is a production-shaped event ticketing demo built around one hard problem: *two people try to buy the same seat at the same time — exactly one of them wins, and nobody is double-charged.* The interesting parts (pessimistic row locking, hold TTLs, idempotent checkout, queue-based payments with retries and seat-releasing compensation) are implemented as real, running code — not described in comments.
 
-[![CI](https://github.com/USERNAME/seatflow/actions/workflows/ci.yml/badge.svg)](https://github.com/USERNAME/seatflow/actions/workflows/ci.yml)
+[![CI](https://github.com/negar73/seatflow/actions/workflows/ci.yml/badge.svg)](https://github.com/negar73/seatflow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./README.md#-roadmap)
 
-> Replace `USERNAME` in the CI badge with your GitHub handle after forking.
 
 ---
 

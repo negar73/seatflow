@@ -25,7 +25,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { apiFetch, ApiClientError } from "@/lib/client";
+import { apiFetch } from "@/lib/client";
 import { formatEventDate, formatPrice } from "@/lib/money";
 import type { BookingDto } from "@/types/api";
 
